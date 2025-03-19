@@ -5,7 +5,7 @@
 /* next steps???:
  * > state transitions feel behind, as if they are operating on previous state logic
  *   and not updating to current state when expected, may be imagining this tho lol.
-     could keep current state transition logic as is, and also add a 'state execute'
+     split update into state transition and state execute
      function to occur after the state transition occurs
 
  * > adjust wheel ratio when turning to allow for variable turn speeds/angles based on error
@@ -146,6 +146,7 @@ void FSM_Update(void) {
         return;
     }
 
+    // transition logic
     switch (currentState) {
         case IDLE:
             WaitForButtonPress();
@@ -156,7 +157,7 @@ void FSM_Update(void) {
 
         case START:
             addState();
-            Motor_Forward(6000, 6000);
+            //Motor_Forward(6000, 6000);
             startTime += 80;
             if (startTime >= 1500) {  // After 2 seconds, switch to normal mode
                 currentState = FORWARD;
@@ -177,9 +178,9 @@ void FSM_Update(void) {
                 currentState = SHARP_RIGHT;
             } else if (checkState(&stateQueue, 1) == FORWARD && checkState(&stateQueue, 2) == FORWARD) {
                 currentState = SPRINT;
-            } else {
+            } /* else {
                 Motor_Forward(5000, 5000);
-            }
+            } */
             break;
 
         case SPRINT:
@@ -192,16 +193,16 @@ void FSM_Update(void) {
                 currentState = SHARP_LEFT;
            } else if(sensorData == 142 || sensorData > 189) {      // 0-2 activated
                 currentState = SHARP_RIGHT;
-           } else {
+           } /*else {
                Motor_Forward(10000, 10000);
-           }
+           } */
            break;
 
         case MILD_LEFT:
             addState();
-            sensorData = Read_Line_Position();
+            //sensorData = Read_Line_Position();
             //Motor_Left(2500, 2525);
-            Motor_Forward(3000, 5000);      // 3:5 wheel turn ratio
+            //Motor_Forward(3000, 5000);      // 3:5 wheel turn ratio
             if(sensorData > -47) {
                 currentState = FORWARD;
             } else if (sensorData == -142 || sensorData < -189) {
@@ -211,9 +212,9 @@ void FSM_Update(void) {
 
         case MILD_RIGHT:
             addState();
-            sensorData = Read_Line_Position();
+            //sensorData = Read_Line_Position();
             //Motor_Right(2525, 2500);
-            Motor_Forward(5000, 3000);  // 3500, 2100 (<- last used value), 3:5 wheel turn ratio
+            //Motor_Forward(5000, 3000);  // 3500, 2100 (<- last used value), 3:5 wheel turn ratio
             if(sensorData < 47) {
                 currentState = FORWARD;
             } else if (sensorData == 142 || sensorData > 189) {
@@ -223,21 +224,21 @@ void FSM_Update(void) {
 
         case SHARP_LEFT:
             addState();
-            Motor_Forward(0, 5000);
+            //Motor_Forward(0, 5000);
             if(sensorData == -189 || sensorData == -47) {
                 currentState = MILD_LEFT;
             } else if (sensorData == 142 || sensorData > 189) {
-                currentState = SHARP_RIGHT;
+                currentState = MILD_RIGHT;
             }
             break;
 
         case SHARP_RIGHT:
             addState();
-            Motor_Forward(5000, 0);
+            //Motor_Forward(5000, 0);
             if(sensorData == 189 || sensorData == 47) {
                 currentState = MILD_RIGHT;
             } else if (sensorData == -142 || sensorData < -189) {
-                currentState = SHARP_LEFT;
+                currentState = MILD_LEFT;
             }
             break;
 
@@ -246,11 +247,45 @@ void FSM_Update(void) {
             Motor_Stop();
             while (1);
     }
+
+    // execute logic
+    switch(currentState) {
+        case IDLE:
+            break;
+        case START:
+            Motor_Forward(6000, 6000);
+            break;
+        case FORWARD:
+            Motor_Forward(5000, 5000);
+            break;
+        case SPRINT:
+            Motor_Forward(8000, 8000);
+            break;
+        case MILD_LEFT:
+            Motor_Forward(3000, 5000);
+            break;
+        case MILD_RIGHT:
+            Motor_Forward(5000, 3000);
+            break;
+        case SHARP_LEFT:
+            Motor_Forward(0, 5000);
+            //Motor_Left(500,5000);
+            break;
+        case SHARP_RIGHT:
+            Motor_Forward(5000, 0);
+            //Motor_Right(5000, 500);
+            break;
+        case STOP:
+            Motor_Stop();
+
+            break;
+
+    }
 }
 
 
 // Main Function with a moderate update delay (20ms)
-int main(void) {
+ int main(void) {
     Clock_Init48MHz();
     UART0_Init();
     Sensor_Init(); // Bump and Reflectance
@@ -260,7 +295,7 @@ int main(void) {
 
     while (1) {
         FSM_Update();
-        Clock_Delay1ms(10);  // Update FSM every 20ms
+        Clock_Delay1ms(5);  // Update FSM every 20ms
         // change delay value when adjust speed
         // higher motor speed may require more frequent state updates
     }
