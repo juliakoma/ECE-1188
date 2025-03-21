@@ -26,7 +26,12 @@
 #include "..\..\..\..\..\..\..\..\ti\tirslk_max_1_00_02\inc\UART0.h"
 
 
-#define CHECK_NUM 2
+#define CHECK_NUM   2
+#define DARK        0x0
+#define YELLOW      0x03
+#define PINK        0x05
+#define SKY_BLUE    0x06
+#define WHITE       0x07
 
 
 // FSM States
@@ -44,7 +49,7 @@ typedef enum {
 
 typedef struct {
     State_t arr[CHECK_NUM];
-    uint8_t front;
+    int8_t front;
     uint8_t rear;
 } Queue;
 
@@ -251,33 +256,49 @@ void FSM_Update(void) {
     // execute logic
     switch(currentState) {
         case IDLE:
+            LaunchPad_LED(1);
+            //LaunchPad_Output(DARK);
             break;
         case START:
+            LaunchPad_LED(0);
+            LaunchPad_Output(WHITE);
             Motor_Forward(6000, 6000);
             break;
         case FORWARD:
+            LaunchPad_LED(0);
+            LaunchPad_Output(GREEN);
             Motor_Forward(5000, 5000);
             break;
         case SPRINT:
+            LaunchPad_Output(YELLOW);
             Motor_Forward(8000, 8000);
             break;
         case MILD_LEFT:
+            LaunchPad_Output(SKY_BLUE);
             Motor_Forward(3000, 5000);
+            //Motor_Forward(5400, 9000);
             break;
         case MILD_RIGHT:
+            LaunchPad_Output(PINK);
             Motor_Forward(5000, 3000);
+            //Motor_Forward(9000, 5400);
             break;
         case SHARP_LEFT:
+            LaunchPad_Output(BLUE);
             Motor_Forward(0, 5000);
-            //Motor_Left(500,5000);
+            //Motor_Forward(0, 3000);
+            //Motor_Left(2500,5000);
             break;
         case SHARP_RIGHT:
+            LaunchPad_Output(RED);
             Motor_Forward(5000, 0);
-            //Motor_Right(5000, 500);
+            //Motor_Forward(3000, 0);
+            //Motor_Right(5000, 2500);
             break;
         case STOP:
+            LaunchPad_LED(1);
+            LaunchPad_Output(RED);
             Motor_Stop();
-
             break;
 
     }
@@ -290,6 +311,7 @@ void FSM_Update(void) {
     UART0_Init();
     Sensor_Init(); // Bump and Reflectance
     Motor_Init();
+    LaunchPad_Init();
     EnableInterrupts();
     initQueue(&stateQueue);
 
