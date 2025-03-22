@@ -1,6 +1,7 @@
 # Robot Go Brr
 ### Speed Demons
-Seth Blain, Julia Koma, Lizza Novikova <br>
+Seth Blain, Julia Koma, Lizza Novikova <br> <br>
+
 Source and implementation code for the Design Project 1 Line Following Robot.
 ## Module and Supplementary Files:
 - `BumpInt.c` and `BumpInt.h`: Source and header files containing the edge-triggered interrupt bump sensor code.
