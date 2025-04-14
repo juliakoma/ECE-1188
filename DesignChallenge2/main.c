@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <stdbool.h>
 #include "msp.h"
 #include "../inc/CortexM.h"
 #include "UART0.h"
@@ -25,32 +26,33 @@ void main(void) {
     BumpInt_Init(&Bump_Handler);  // Bump interrupts
 
     UART0_OutString("BlueToothReady: ");
-    
+
     while (1) {
-        char cmd = BlueToth_Handler();
+        bool cmd = BlueTooth_Handler();
 
     }
 }
 
-int BlueTooth_Handler(char cmd){
+bool BlueTooth_Handler(char cmd){
     if (UART0_CharAvailable()) {
         char cmd = UART0_InChar();
-        UART0_OutString("Received: ");
-        UART0_OutChar(cmd);
-        UART0_OutChar('\n');
-
+        bool BlueCmd;
         switch (cmd) {
-            case 'GO':
+            case 'G':
                 Motor_Forward(DUTY_LEFT, DUTY_RIGHT);
                 UART0_OutString("Moving Forward\n");
+                BlueCmd = 1;
                 break;
-            case 'STOP':
+            case 'S':
                 Motor_Stop();
                 UART0_OutString("BUMP\n");
+                BlueCmd = 0;
                 break;
             default:
                 UART0_OutString("Unknown Command\n");
         }
+
+        return BlueCmd;
     }
 }
 
