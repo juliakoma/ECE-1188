@@ -5,10 +5,20 @@
 #include "UART0.h"
 #include "Motor.h"
 #include "BumpInt.h"
+#include "../inc/Reflectance.h"
 
-// Movement speed constants (adjust as needed)
+// Movement speed constants
 #define DUTY_LEFT 1700
 #define DUTY_RIGHT 1700
+
+// Variables
+bool goFlag = 0;
+bool collisionFlag = 0;
+
+// Function prototypes
+void HandleCollision(uint8_t bumpSensor);
+void Sensor_Init(void);
+void BlueTooth_Handler(void);
 
 // Bump sensor event handler
 void Bump_Handler(uint8_t bumpData) {
@@ -19,52 +29,70 @@ void Bump_Handler(uint8_t bumpData) {
 }
 
 void main(void) {
-    // Variables
-    bool goFlag;
-    
-    Clock_Init48MHz();
 
+    Clock_Init48MHz();
     UART0_Init();    // UART for Bluetooth
     Motor_Init();    // PWM motor setup
-    BumpInt_Init(&Bump_Handler);  // Bump interrupts
-
-    UART0_OutString("BlueToothReady: ");
+    //Sensor_Init(); // Bump and Reflectance
+    //Motor_Forward(2000, 2000);
+    char cmd;
 
     while (1) {
-        goFlag = BlueTooth_Handler();
-        
-        if (goFlag == 1){
-            // Logic here
-        }
-        else (goFlag == 0){
-            // Stop Logic here
-        }
-        
-        
+        BlueTooth_Handler();
 
+        if (collisionFlag) {
+            collisionFlag = 0;
+            goFlag = 0;
+            continue;
+        }
+
+        if (goFlag == 1){
+            // Moving Logic here
+            Motor_Forward(1700, 1700);
+
+        }
+
+        if (goFlag == 0){
+            // Stop Logic here
+            Motor_Stop();
+        }
     }
 }
 
-bool BlueTooth_Handler(char cmd){
+// Initialize Sensors
+void Sensor_Init(void) {
+    Reflectance_Init();
+    BumpInt_Init(&HandleCollision);  // Use bump sensor interrupts
+}
+
+// Handle Bump Collision
+void HandleCollision(uint8_t bumpSensor) {
+    Motor_Stop();   // Stop immediately
+    collisionFlag = 1; // Set collision flag
+    UART0_OutString("Collision detected! Stopping...\n\r");
+}
+
+void BlueTooth_Handler(){
+    char cmd;
     if (UART0_CharAvailable()) {
         char cmd = UART0_InChar();
-        bool BlueCmd;
+        UART0_OutString("Command Received is: ");
+        UART0_OutChar(cmd);
+
         switch (cmd) {
             case 'G':
-                Motor_Forward(DUTY_LEFT, DUTY_RIGHT);
                 UART0_OutString("Moving Forward\n");
-                BlueCmd = 1;
+                goFlag = 1;
                 break;
+
             case 'S':
                 Motor_Stop();
                 UART0_OutString("BUMP\n");
-                BlueCmd = 0;
+                goFlag = 0;
                 break;
             default:
                 UART0_OutString("Unknown Command\n");
         }
-
-        return BlueCmd;
     }
 }
 
