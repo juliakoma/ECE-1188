@@ -19,6 +19,9 @@ void Bump_Handler(uint8_t bumpData) {
 }
 
 void main(void) {
+    // Variables
+    bool goFlag;
+    
     Clock_Init48MHz();
 
     UART0_Init();    // UART for Bluetooth
@@ -28,7 +31,16 @@ void main(void) {
     UART0_OutString("BlueToothReady: ");
 
     while (1) {
-        bool cmd = BlueTooth_Handler();
+        goFlag = BlueTooth_Handler();
+        
+        if (goFlag == 1){
+            // Logic here
+        }
+        else (goFlag == 0){
+            // Stop Logic here
+        }
+        
+        
 
     }
 }
