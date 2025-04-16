@@ -59,11 +59,11 @@
 #include "simplelink.h"
 #include "sl_common.h"
 #include "MQTTClient.h"
-#include "MotorSimple.h"
 #include "SysTick.h"
 #include "Motor.h"
 #include "Reflectance.h"
 #include "BumpInt.h"
+//#include "UART0.h"
 #include "UART0.h"
 #include "Clock.h"
 
@@ -213,7 +213,7 @@ void SimpleLinkWlanEventHandler(SlWlanEvent_t *pWlanEvent)
 {
     if(pWlanEvent == NULL)
         CLI_Write(" [WLAN EVENT] NULL Pointer Error \n\r");
-    
+
     switch(pWlanEvent->Event)
     {
         case SL_WLAN_CONNECT_EVENT:
@@ -277,7 +277,7 @@ void SimpleLinkNetAppEventHandler(SlNetAppEvent_t *pNetAppEvent)
 {
     if(pNetAppEvent == NULL)
         CLI_Write(" [NETAPP EVENT] NULL Pointer Error \n\r");
- 
+
     switch(pNetAppEvent->Event)
     {
         case SL_NETAPP_IPV4_IPACQUIRED_EVENT:
@@ -403,44 +403,7 @@ int main(int argc, char** argv)
     UART0_Init();    // UART for Bluetooth
     Motor_Init();    // PWM motor setup
     Sensor_Init();   // Bump and Reflectance
-
-    _i32 retVal = -1;
     bool finish_flag = 0;
-
-    retVal = initializeAppVariables();
-    ASSERT_ON_ERROR(retVal);
-
-    /* Stop WDT and initialize the system-clock of the MCU */
-    stopWDT();
-    initClk();
-
-    /* GPIO Setup for Pins 2.0-2.2
-    MAP_PMAP_configurePorts((const uint8_t *) port_mapping, PMAP_P2MAP, 1,
-        PMAP_DISABLE_RECONFIGURATION);
-
-    MAP_GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P2,
-        GPIO_PIN0 | GPIO_PIN1 | GPIO_PIN2, GPIO_PRIMARY_MODULE_FUNCTION);
-*/
-    /* Confinguring P1.1 & P1.4 as an input and enabling interrupts */
-    GPIO_setAsInputPinWithPullUpResistor(GPIO_PORT_P1, GPIO_PIN1 | GPIO_PIN4);
-    GPIO_clearInterruptFlag(GPIO_PORT_P1, GPIO_PIN1 | GPIO_PIN4);
-    GPIO_enableInterrupt(GPIO_PORT_P1, GPIO_PIN1 | GPIO_PIN4);
-    GPIO_interruptEdgeSelect(GPIO_PORT_P1, GPIO_PIN1 | GPIO_PIN4, GPIO_HIGH_TO_LOW_TRANSITION);
-    GPIO_clearInterruptFlag(GPIO_PORT_P1, GPIO_PIN1 | GPIO_PIN4);
-
-    GPIO_setOutputLowOnPin(GPIO_PORT_P1, GPIO_PIN0);
-    GPIO_setAsOutputPin(GPIO_PORT_P1, GPIO_PIN0);
-
-    /* Configure TimerA0 for RGB LED
-    TA0CCR0 = PWM_PERIOD;                   // PWM Period
-    TA0CCTL1 = OUTMOD_7;                    // CCR1 reset/set
-    TA0CCR1 = PWM_PERIOD * (0/255);                 // CCR1 PWM duty cycle
-    TA0CCTL2 = OUTMOD_7;                    // CCR2 reset/set
-    TA0CCR2 = PWM_PERIOD * (0/255);                 // CCR2 PWM duty cycle
-    TA0CCTL3 = OUTMOD_7;                    // CCR3 reset/set
-    TA0CCR3 = PWM_PERIOD * (0/255);                 // CCR3 PWM duty cycle
-    TA0CTL = TASSEL__SMCLK | MC__UP | TACLR;  // SMCLK, up mode, clear TAR
-*/
 
     if(!finish_flag){
         while (1) {
@@ -467,6 +430,32 @@ int main(int argc, char** argv)
     }
 
     if (finish_flag){
+        _i32 retVal = -1;
+
+        retVal = initializeAppVariables();
+        ASSERT_ON_ERROR(retVal);
+
+        /* Stop WDT and initialize the system-clock of the MCU */
+        stopWDT();
+        initClk();
+
+        /* GPIO Setup for Pins 2.0-2.2
+        MAP_PMAP_configurePorts((const uint8_t *) port_mapping, PMAP_P2MAP, 1,
+            PMAP_DISABLE_RECONFIGURATION);
+
+        MAP_GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P2,
+            GPIO_PIN0 | GPIO_PIN1 | GPIO_PIN2, GPIO_PRIMARY_MODULE_FUNCTION);
+    */
+        /* Confinguring P1.1 & P1.4 as an input and enabling interrupts */
+        GPIO_setAsInputPinWithPullUpResistor(GPIO_PORT_P1, GPIO_PIN1 | GPIO_PIN4);
+        GPIO_clearInterruptFlag(GPIO_PORT_P1, GPIO_PIN1 | GPIO_PIN4);
+        GPIO_enableInterrupt(GPIO_PORT_P1, GPIO_PIN1 | GPIO_PIN4);
+        GPIO_interruptEdgeSelect(GPIO_PORT_P1, GPIO_PIN1 | GPIO_PIN4, GPIO_HIGH_TO_LOW_TRANSITION);
+        GPIO_clearInterruptFlag(GPIO_PORT_P1, GPIO_PIN1 | GPIO_PIN4);
+
+        GPIO_setOutputLowOnPin(GPIO_PORT_P1, GPIO_PIN0);
+        GPIO_setAsOutputPin(GPIO_PORT_P1, GPIO_PIN0);
+
         /* Configuring TimerA1 for Up Mode */
         Timer_A_configureUpMode(TIMER_A1_BASE, &upConfig);
 
@@ -658,10 +647,10 @@ static void messageArrived(MessageData* data) {
     buf[data->message->payloadlen] = 0;
 
     if (!strcmp(buf, "go")){
-        Motor_ForwardSimple(2000,500);
+        Motor_Forward(2000,500);
     }
     else if (!strcmp(buf, "stop")){
-        Motor_StopSimple();
+        Motor_Stop();
     }
 
     else {
@@ -938,6 +927,8 @@ void HandleCollision(uint8_t bumpSensor) {
     Clock_Delay1ms(500);          // Pause for 0.5 seconds
     Motor_Backward(2000, 2000);   // Back up first
     Clock_Delay1ms(300);          // for 0.3 seconds
+
+    Motor_Forward(2000,2000);
 
     goFlag = 1;                   // Resume forward motion in main loop
 }
