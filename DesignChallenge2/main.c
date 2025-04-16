@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdbool.h>
+
 #include "msp.h"
 #include "../inc/CortexM.h"
 #include "UART0.h"
@@ -8,12 +9,18 @@
 #include "../inc/Reflectance.h"
 
 // Movement speed constants
-#define DUTY_LEFT 1700
-#define DUTY_RIGHT 1700
+#define DUTY_LEFT 2000
+#define DUTY_RIGHT 2000
 
 // Variables
 bool goFlag = 0;
 bool collisionFlag = 0;
+uint32_t startTime = 0;
+uint32_t endTime = 0;
+uint32_t crashCount = 0;
+uint16_t distanceLog[100];
+uint8_t distanceIndex = 0;
+uint16_t maxSpeed = 0;
 
 // Function prototypes
 void HandleCollision(uint8_t bumpSensor);
@@ -35,7 +42,6 @@ void main(void) {
     UART0_Init();    // UART for Bluetooth
     Motor_Init();    // PWM motor setup
     Sensor_Init();   // Bump and Reflectance
-    //EnableInterrupts();
 
     while (1) {
         BlueTooth_Handler();
@@ -49,10 +55,9 @@ void main(void) {
 
         // Bluetooth command is go
         if (goFlag == 1) {
-            uint8_t reflectance = Reflectance_Read(2000);
-
+            uint8_t reflectance = Reflectance_Read(1200);
             // Reached finish line
-            if (reflectance > 0xE7) {
+            if (reflectance != 0) {
                 UART0_OutString("Black line detected! Stopping...\n\r");
                 Motor_Stop();
                 goFlag = 0;
