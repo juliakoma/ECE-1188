@@ -1,0 +1,169 @@
+#include <stdint.h>
+#include <stdbool.h>
+#include "/mqtt/MQTTClient.h"
+#include "simplelink.h"
+#include "sl_common.h"
+#include "msp.h"
+#include "../inc/CortexM.h"
+#include "UART0.h"
+#include "Motor.h"
+#include "BumpInt.h"
+#include "../inc/Reflectance.h"
+
+// Movement speed constants
+#define DUTY_LEFT 2000
+#define DUTY_RIGHT 2000
+
+// WIFI connection
+#define SSID_NAME       "Julia"       /* Access point name to connect to. */
+#define SEC_TYPE        SL_SEC_TYPE_WPA_WPA2     /* Security type of the Access piont */
+#define PASSKEY         "hellohello"   /* Password in case of secure AP */
+#define PASSKEY_LEN     pal_Strlen(PASSKEY)
+
+// Broker
+#define MQTT_BROKER_SERVER  "broker.mqtt.cool"
+#define SUBSCRIBE_TOPIC "designChallenge"
+
+Network n;
+Client mqttClient;
+char mqttSendBuf[100], mqttReadBuf[100];
+
+// Variables
+bool goFlag = 0;
+bool collisionFlag = 0;
+uint32_t startTime = 0;
+uint32_t endTime = 0;
+uint32_t crashCount = 0;
+uint16_t distanceLog[100];
+uint8_t distanceIndex = 0;
+uint16_t maxSpeed = 0;
+
+// Function prototypes
+void HandleCollision(uint8_t bumpSensor);
+void Sensor_Init(void);
+void BlueTooth_Handler(void);
+
+
+void main(void) {
+
+    Clock_Init48MHz();
+    InitWiFiAndMQTT();
+    UART0_Init();    // UART for Bluetooth
+    Motor_Init();    // PWM motor setup
+    Sensor_Init();   // Bump and Reflectance
+
+    while (1) {
+        BlueTooth_Handler();
+        MQTTYield(&mqttClient, 10);
+        static bool testPublished = false;
+
+        if (!testPublished) {
+            const char* message = "{\"test\":\"Hello from MSP432!\"}";
+            MQTT_Publish(mqttTopic, message, strlen(message));
+            testPublished = true;
+        }
+
+        // Bluetooth command is go
+        if (goFlag == 1) {
+            uint8_t reflectance = Reflectance_Read(1200);
+            // Reached finish line
+            if (reflectance != 0) {
+                UART0_OutString("Black line detected! Stopping...\n\r");
+                Motor_Stop();
+                goFlag = 0;
+            } else {
+                Motor_Forward(DUTY_LEFT, DUTY_RIGHT);
+            }
+        }
+
+        // Bluetooth command is stop
+        if (goFlag == 0) {
+            //Motor_Stop();
+        }
+    }
+}
+
+void MQTT_Publish(const char* topic, const char* payload, uint16_t length) {
+    MQTTMessage msg;
+    msg.qos = QOS0;
+    msg.retained = 0;
+    msg.payload = (void*)payload;
+    msg.payloadlen = length;
+
+    int rc = MQTTPublish(&mqttClient, topic, &msg);
+    if (rc != 0) {
+        UART0_OutString("MQTT publish failed\n\r");
+    } else {
+        UART0_OutString("MQTT message published\n\r");
+    }
+}
+
+
+void InitWiFiAndMQTT(void) {
+    int rc;
+
+    NewNetwork(&n);
+    rc = ConnectNetwork(&n, mqttBroker, 1883);
+    if (rc != 0) {
+        UART0_OutString("MQTT broker connection failed\n\r");
+        while(1);
+    }
+
+    MQTTClient(&mqttClient, &n, 1000, mqttSendBuf, sizeof(mqttSendBuf), mqttReadBuf, sizeof(mqttReadBuf));
+    MQTTPacket_connectData cdata = MQTTPacket_connectData_initializer;
+    cdata.MQTTVersion = 3;
+    cdata.clientID.cstring = "MSP432Client";
+
+    rc = MQTTConnect(&mqttClient, &cdata);
+    if (rc != 0) {
+        UART0_OutString("MQTT client connect failed\n\r");
+        while(1);
+    }
+
+    UART0_OutString("MQTT client connected\n\r");
+}
+
+
+// Initialize Sensors
+void Sensor_Init(void) {
+    Reflectance_Init();
+    BumpInt_Init(&HandleCollision);  // Use bump sensor interrupts
+}
+
+// Handle Bump Collision
+void HandleCollision(uint8_t bumpSensor) {
+    crashCount++;
+    UART0_OutString("Collision detected! Backing up...\n\r");
+
+    Motor_Stop();                 // Fully stop
+    Clock_Delay1ms(500);          // Pause for 0.5 seconds
+    Motor_Backward(2000, 2000);   // Back up first
+    Clock_Delay1ms(300);          // for 0.3 seconds
+
+    goFlag = 1;                   // Resume forward motion in main loop
+}
+
+void BlueTooth_Handler(){
+    char cmd;
+    if (UART0_CharAvailable()) {
+        cmd = UART0_InChar();
+        UART0_OutString("Command Received is: ");
+        UART0_OutChar(cmd);
+
+        switch (cmd) {
+            case 'G':
+                UART0_OutString("Moving Forward\n");
+                goFlag = 1;
+                break;
+
+            case 'S':
+                Motor_Stop();
+                goFlag = 0;
+                break;
+            default:
+                UART0_OutString("Unknown Command\n");
+        }
+    }
+}
+
+
