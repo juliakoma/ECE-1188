@@ -27,14 +27,6 @@ void HandleCollision(uint8_t bumpSensor);
 void Sensor_Init(void);
 void BlueTooth_Handler(void);
 
-// Bump sensor event handler
-void Bump_Handler(uint8_t bumpData) {
-    UART0_OutString("BUMP ");
-    UART0_OutUDec(bumpData);
-    UART0_OutString("\n");
-    Motor_Stop();
-}
-
 
 void main(void) {
 
@@ -45,13 +37,6 @@ void main(void) {
 
     while (1) {
         BlueTooth_Handler();
-
-        // Bump Occurred
-        if (collisionFlag) {
-            collisionFlag = 0;
-            goFlag = 0;
-            continue;
-        }
 
         // Bluetooth command is go
         if (goFlag == 1) {
@@ -68,7 +53,7 @@ void main(void) {
 
         // Bluetooth command is stop
         if (goFlag == 0) {
-            Motor_Stop();
+            //Motor_Stop();
         }
     }
 }
@@ -82,9 +67,15 @@ void Sensor_Init(void) {
 
 // Handle Bump Collision
 void HandleCollision(uint8_t bumpSensor) {
-    Motor_Stop();   // Stop immediately
-    collisionFlag = 1; // Set collision flag
-    UART0_OutString("Collision detected! Stopping...\n\r");
+    crashCount++;
+    UART0_OutString("Collision detected! Backing up...\n\r");
+
+    Motor_Stop();                 // Fully stop
+    Clock_Delay1ms(500);          // Pause for 0.5 seconds
+    Motor_Backward(2000, 2000);   // Back up first
+    Clock_Delay1ms(300);          // for 0.3 seconds
+
+    goFlag = 1;                   // Resume forward motion in main loop
 }
 
 void BlueTooth_Handler(){
@@ -102,7 +93,6 @@ void BlueTooth_Handler(){
 
             case 'S':
                 Motor_Stop();
-                UART0_OutString("BUMP\n");
                 goFlag = 0;
                 break;
             default:
@@ -110,7 +100,5 @@ void BlueTooth_Handler(){
         }
     }
 }
-
-
 
 
